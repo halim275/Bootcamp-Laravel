@@ -81,7 +81,7 @@
                         </div>
                         @if (ucfirst($memberTransaction->status) == 'PENDING')
                             <div class="col-lg-12 col-md-12 col-12">
-                                <p>Silahkan selesaikan pembayaran sebelum <b>{{ $memberTransaction->transaction_exp }}</b>.
+                                <p>Silahkan selesaikan pembayaran sebelum <b>{{ date('d F Y H:i', strtotime($memberTransaction->xendit->expiry_date)) }}</b>.
                                     Terima Kasih</p>
                                 <a href="{{ $memberTransaction->xendit->invoice_url ?? null }}">
                                     <button type="button" class="btn btn-primary" style="float: right;">Selesaikan

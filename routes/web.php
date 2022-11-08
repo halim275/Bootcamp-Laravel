@@ -46,5 +46,5 @@ Route::controller(HomeController::class)->prefix('bootcamp')->middleware('auth')
 Auth::routes();
 
 Route::controller(XenditController::class)->group(function () {
-    Route::post('/xendit-callback', 'XenditCallback');
+    Route::post('/xendit-callback', 'xenditCallback');
 });

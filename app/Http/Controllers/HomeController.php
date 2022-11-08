@@ -133,6 +133,7 @@ class HomeController extends Controller
         ];
 
         $createInvoce = \Xendit\Invoice::create($params);
+        $tgl = date("Y-m-d H:i:s", strtotime($createInvoce['expiry_date']));
 
         try {
             DB::beginTransaction();
@@ -151,6 +152,7 @@ class HomeController extends Controller
             $xendit->external_id = $uuidna;
             $xendit->invoice_url = $createInvoce['invoice_url'];
             $xendit->description = $createInvoce['description'];
+            $xendit->expiry_date = $tgl;
             $xendit->save();
 
             DB::commit();

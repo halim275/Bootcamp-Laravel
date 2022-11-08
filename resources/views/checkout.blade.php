@@ -69,8 +69,7 @@
 
                             </div>
                             <div class="col-lg-12 col-md-12 col-12 mt-5">
-                                <button type="submit" class="btn btn-primary" style="float: right;">Pilih Metode
-                                    Pembayaran</button>
+                                <button type="submit" class="btn btn-primary" style="float: right;">Order Bootcamp</button>
                             </div>
                         </form>
                     </div>
