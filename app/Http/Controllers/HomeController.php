@@ -2,19 +2,22 @@
 
 namespace App\Http\Controllers;
 
+use Xendit\Xendit;
 use App\Models\Bootcamp;
-use App\Models\MemberTransaction;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Illuminate\Http\Request;
+use App\Models\MemberTransaction;
+use App\Models\XenditTransaction;
+use Illuminate\Support\Facades\Auth;
+use DB;
 
 class HomeController extends Controller
 {
-    /**
-     * Show the application dashboard.
-     *
-     * @return \Illuminate\Contracts\Support\Renderable
-     */
+    public function __construct()
+    {
+        Xendit::setApiKey(env('XENDIT_API_KEY'));
+    }
+
     public function index()
     {
         $bootcamps = Bootcamp::orderBy('id', 'desc')->get();
@@ -24,10 +27,11 @@ class HomeController extends Controller
     public function checkout($bootcampID)
     {
 
-        $memberTransaction = MemberTransaction::with('xendit')->where([
-            'member_id' => Auth::id(),
-            'bootcamp_id' => $bootcampID
-        ])
+        $memberTransaction = MemberTransaction::with('xendit')
+            ->where([
+                'member_id' => Auth::id(),
+                'bootcamp_id' => $bootcampID
+            ])
             ->first();
 
         $checkkout = false;
@@ -44,12 +48,58 @@ class HomeController extends Controller
         $bootcamp->ppn = 0.11 * $bootcamp->price;
         $bootcamp->total = $bootcamp->ppn + $bootcamp->price;
 
-
         if ($checkkout == true) {
-
-            return to_route('detail', $bootcamp->transaction_id);
+            return to_route('detail', $memberTransaction->transaction_id);
         }
         return view('checkout', ['bootcamp' => $bootcamp]);
+    }
+
+    public function invoice(Request $request, $bootcampID)
+    {
+        $memberTransaction = MemberTransaction::where([
+            'member_id' => Auth::id(),
+            'bootcamp_id' => $bootcampID
+        ])
+            ->first();
+
+        if ($memberTransaction == MemberTransaction::PAYMENT_STATUS_PENDING) {
+            return to_route('detail', $memberTransaction->transaction_id);
+        }
+
+        $bootcamp = Bootcamp::where('id', $bootcampID)->first();
+        $finalPrice = (0.11 * $bootcamp->price) + $bootcamp->price;
+        $external_id = Str::uuid();
+        $params = [
+            'external_id'       => $external_id,
+            'amount'            => intval($finalPrice),
+            'description'       => 'Pembayaran ' . $bootcamp->title,
+        ];
+
+
+        $createInvoce = \Xendit\Invoice::create($params);
+
+        DB::beginTransaction();
+
+        $transaction = new MemberTransaction();
+        $transaction->transaction_id = $external_id;
+        $transaction->member_id = Auth::id();
+        $transaction->bootcamp_id = $bootcampID;
+        $transaction->price = $bootcamp->price;
+        $transaction->final_price = $finalPrice;
+        $transaction->status = MemberTransaction::PAYMENT_STATUS_PENDING;
+        $transaction->save();
+
+        $xendit = new XenditTransaction();
+        $xendit->id = $createInvoce['id'];
+        $xendit->external_id = $external_id;
+        $xendit->invoice_url = $createInvoce['invoice_url'];
+        $xendit->description = $createInvoce['description'];
+        $xendit->save();
+
+        DB::commit();
+
+        dd($createInvoce);
+        // return redirect($createInvoce['invoice_url']);
     }
 
     public function actCheckout(Request $request, $bootcampID)
@@ -69,26 +119,26 @@ class HomeController extends Controller
         }
 
         // validate bootcamp
-        $bootcamp = $this->bootcampRepository->detail($bootcampID);
+        $bootcamp = Bootcamp::with('member')->where('id', $bootcampID)->first();
         if (!$bootcamp) {
             return redirect()->back()->with('danger', 'Bootcamp tidak ditemukan');
         }
-
         $finalPrice = (0.11 * $bootcamp->price) + $bootcamp->price;
 
-        $transactionExp = date('Y-m-d H:i:s', strtotime("1 days"));
+        $uuidna = Str::uuid();
+        $params = [
+            'external_id'       => $uuidna,
+            'amount'            => intval($finalPrice),
+            'description'       => 'Pembayaran ' . $bootcamp->title,
+        ];
 
-        $bootcamp->transaction_id = Str::uuid();
-        $bootcamp->member_id = Auth::id();
-        $bootcamp->bootcamp_id = $bootcampID;
-        $bootcamp->final_price = $finalPrice;
-        $bootcamp->transaction_exp = $transactionExp;
+        $createInvoce = \Xendit\Invoice::create($params);
 
         try {
             DB::beginTransaction();
 
             $transaction = new MemberTransaction();
-            $transaction->transaction_id = Str::uuid();
+            $transaction->transaction_id = $uuidna;
             $transaction->member_id = Auth::id();
             $transaction->bootcamp_id = $bootcampID;
             $transaction->price = $bootcamp->price;
@@ -96,8 +146,15 @@ class HomeController extends Controller
             $transaction->status = MemberTransaction::PAYMENT_STATUS_PENDING;
             $transaction->save();
 
+            $xendit = new XenditTransaction();
+            $xendit->id = $createInvoce['id'];
+            $xendit->external_id = $uuidna;
+            $xendit->invoice_url = $createInvoce['invoice_url'];
+            $xendit->description = $createInvoce['description'];
+            $xendit->save();
+
             DB::commit();
-            return to_route('detail', $memberTransaction->transaction_id);
+            return to_route('detail', $transaction->transaction_id);
         } catch (\Throwable $th) {
             DB::rollBack();
             Log::info('transaction');
@@ -108,7 +165,12 @@ class HomeController extends Controller
 
     public function detail($bootcampTransactionID)
     {
-        $memberTransaction = $this->transactionService->detail(Auth::id(), $bootcampTransactionID);
+        // $memberTransaction = $this->transactionService->detail(Auth::id(), $bootcampTransactionID);
+        $memberTransaction = MemberTransaction::with(['xendit', 'bootcamp'])->where([
+            'member_id' => Auth::id(),
+            'transaction_id' => $bootcampTransactionID
+        ])
+            ->first();
 
         if (!$memberTransaction) {
             return to_route('bootcamps');

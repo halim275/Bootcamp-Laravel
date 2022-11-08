@@ -14,9 +14,9 @@ class MemberTransaction extends Model
     const PAYMENT_CHANNEL_LINKAJA = 'linkaja';
 
 
-    const PAYMENT_STATUS_PENDING = 'pending';
-    const PAYMENT_STATUS_ACCEPT = 'accept';
-    const PAYMENT_STATUS_EXPIRED = 'expired';
+    const PAYMENT_STATUS_PENDING    = 'PENDING';
+    const PAYMENT_STATUS_ACCEPT     = 'PAID';
+    const PAYMENT_STATUS_EXPIRED    = 'EXPIRED';
 
     public function bootcamp()
     {

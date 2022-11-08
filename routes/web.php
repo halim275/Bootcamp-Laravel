@@ -35,16 +35,15 @@ Route::get('/run-seed', function () {
     ]);
 });
 
-Route::controller(HomeController::class)->prefix('bootcamp')->group(function () {
+Route::controller(HomeController::class)->prefix('bootcamp')->middleware('auth')->group(function () {
     Route::get('/', 'index')->name('bootcamps');
     Route::get('/{bootcampID}', 'checkout')->name('checkout');
     Route::post('/{bootcampID}', 'actCheckout')->name('actCheckout');
+    // Route::post('/{bootcampID}', 'invoice')->name('invoice');
     Route::get('/transaction/{bootcampTransactionID}', 'detail')->name('detail');
 });
 
 Auth::routes();
-
-Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
 
 Route::controller(XenditController::class)->group(function () {
     Route::post('/xendit-callback', 'XenditCallback');
